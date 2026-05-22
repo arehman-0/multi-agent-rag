@@ -1,0 +1,16 @@
+langgraph>=0.2.50
+langchain-core>=0.3.0
+langchain-ollama>=0.2.0
+langchain-mcp-adapters>=0.1.0
+mcp>=1.0.0
+chromadb>=0.5.0
+ollama>=0.4.0
+faster-whisper>=1.0.3
+pyttsx3>=2.90
+streamlit>=1.40.0
+pypdf>=5.0.0
+opentelemetry-api>=1.27.0
+opentelemetry-sdk>=1.27.0
+opentelemetry-exporter-otlp-proto-http>=1.27.0
+pytest>=8.0.0
+pytest-asyncio>=0.24.0
