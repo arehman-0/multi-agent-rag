@@ -1,0 +1,3 @@
+LangGraph is a library for building stateful, multi-actor applications with LLMs.
+It extends LangChain with the ability to coordinate multiple chains across multiple steps.
+The Model Context Protocol (MCP) standardises how applications provide context to LLMs.
