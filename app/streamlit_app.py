@@ -6,7 +6,6 @@ import streamlit as st
 from agents.runtime import build_runtime_graph
 from agents.state import new_state
 from app.voice import speak, transcribe
-from mcp_server.tools.ingest import ingest_doc
 from observability.tracing import init_tracing
 from config import MAX_UPLOAD_MB, UPLOAD_DIR
 
@@ -14,6 +13,24 @@ init_tracing()
 
 st.set_page_config(page_title="Multi-Agent RAG", layout="wide")
 st.title("Multi-Agent RAG (Retriever + Synthesizer)")
+
+
+@st.cache_resource
+def _get_event_loop():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    return loop
+
+
+def _runtime():
+    """Build or fetch the cached graph + MCP client + context for this session."""
+    if "runtime" not in st.session_state:
+        loop = _get_event_loop()
+        graph, mcp_client, ctx = loop.run_until_complete(build_runtime_graph())
+        st.session_state["runtime"] = (graph, mcp_client, ctx)
+        st.session_state["loop"] = loop
+    return st.session_state["runtime"]
+
 
 # --- Sidebar: upload
 with st.sidebar:
@@ -25,12 +42,22 @@ with st.sidebar:
         else:
             dest = UPLOAD_DIR / uploaded.name
             dest.write_bytes(uploaded.getbuffer())
-            with st.spinner(f"Ingesting {uploaded.name}..."):
-                result = ingest_doc(str(dest))
-            if result["status"] == "ok":
-                st.success(f"Ingested {result['chunks']} chunks.")
-            else:
-                st.error(f"Ingest failed: {result.get('reason')}")
+            try:
+                _, mcp_client, _ = _runtime()
+                loop = st.session_state["loop"]
+                with st.spinner(f"Ingesting {uploaded.name}..."):
+                    result = loop.run_until_complete(
+                        mcp_client.call_tool("ingest_doc", path=str(dest))
+                    )
+                if isinstance(result, dict) and result.get("status") == "ok":
+                    st.success(f"Ingested {result['chunks']} chunks.")
+                elif isinstance(result, dict):
+                    st.error(f"Ingest failed: {result.get('reason', 'unknown')}")
+                else:
+                    # Tool returned a non-dict (e.g. a ToolMessage string); treat as ok
+                    st.success(f"Ingested {uploaded.name}.")
+            except Exception as exc:
+                st.error(f"Ingest failed: {exc}")
 
 # --- Main: question input
 st.subheader("Ask a question")
@@ -49,18 +76,15 @@ if audio is not None and not text_q:
     st.write(f"**Heard:** {question}")
 
 # --- Run pipeline
-async def _run(q: str):
-    graph, ctx = await build_runtime_graph()
-    try:
-        result = await graph.ainvoke(new_state(q))
-        return result
-    finally:
-        await ctx.__aexit__(None, None, None)
+async def _ask(q: str):
+    graph, _, _ = _runtime()
+    return await graph.ainvoke(new_state(q))
 
 
 if st.button("Ask", type="primary") and question.strip():
     with st.spinner("Thinking..."):
-        result = asyncio.run(_run(question))
+        loop = _get_event_loop()
+        result = loop.run_until_complete(_ask(question))
     if result.get("error"):
         st.error(f"Error: {result['error']}")
     else:

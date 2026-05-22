@@ -39,7 +39,7 @@ def clean_chroma(tmp_path, monkeypatch):
 
 async def _run():
     ingest_doc("tests/fixtures/sample.txt")
-    graph, ctx = await build_runtime_graph(model=LLM_MODEL_TEST)
+    graph, mcp_client, ctx = await build_runtime_graph(model=LLM_MODEL_TEST)
     try:
         state = new_state("What is LangGraph?")
         result = await graph.ainvoke(state)

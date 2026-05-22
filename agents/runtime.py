@@ -39,9 +39,14 @@ async def mcp_session():
 
 
 async def build_runtime_graph(model: str = LLM_MODEL):
-    """Returns (graph, mcp_context_manager). Caller must hold the context open while invoking."""
+    """Returns (graph, mcp_client, mcp_context_manager).
+
+    Caller must hold the context open while invoking the graph or the
+    mcp_client directly (e.g. for ingest).  Close with:
+        await ctx.__aexit__(None, None, None)
+    """
     llm = ChatOllama(model=model, base_url=OLLAMA_HOST)
     ctx = mcp_session()
     mcp_client = await ctx.__aenter__()
     graph = build_graph(mcp_client=mcp_client, llm=llm)
-    return graph, ctx
+    return graph, mcp_client, ctx
