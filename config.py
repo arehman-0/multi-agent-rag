@@ -1,4 +1,5 @@
 """Single source of truth for tunables. No code outside this module reads env vars."""
+import os
 from pathlib import Path
 
 OLLAMA_HOST = "http://localhost:11434"
@@ -7,7 +8,7 @@ LLM_MODEL_TEST = "llama3.2:1b"
 EMBED_MODEL = "nomic-embed-text"
 
 PROJECT_ROOT = Path(__file__).parent
-CHROMA_PATH = str(PROJECT_ROOT / ".chroma")
+CHROMA_PATH = os.environ.get("CHROMA_PATH", str(PROJECT_ROOT / ".chroma"))
 UPLOAD_DIR = PROJECT_ROOT / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 

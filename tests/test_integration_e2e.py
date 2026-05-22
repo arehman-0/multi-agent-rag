@@ -4,6 +4,7 @@ Requires: Ollama running with llama3.2:1b and nomic-embed-text pulled.
 Run with: RUN_E2E=1 pytest tests/test_integration_e2e.py -v -s
 """
 import asyncio
+import importlib
 import os
 import shutil
 import pytest
@@ -11,7 +12,7 @@ import pytest
 from agents.state import new_state
 from agents.runtime import build_runtime_graph
 from mcp_server.tools.ingest import ingest_doc
-import config
+from config import LLM_MODEL_TEST
 
 pytestmark = pytest.mark.skipif(
     os.getenv("RUN_E2E") != "1",
@@ -22,7 +23,11 @@ pytestmark = pytest.mark.skipif(
 @pytest.fixture(autouse=True)
 def clean_chroma(tmp_path, monkeypatch):
     chroma_dir = tmp_path / "chroma"
-    monkeypatch.setattr(config, "CHROMA_PATH", str(chroma_dir))
+    # Set env var so config.py re-reads it fresh (for subprocesses and reloads).
+    monkeypatch.setenv("CHROMA_PATH", str(chroma_dir))
+    # Also patch module-level attributes so in-process code picks up the tmp dir.
+    import config as _cfg
+    importlib.reload(_cfg)
     monkeypatch.setattr("mcp_server.tools.ingest.CHROMA_PATH", str(chroma_dir))
     monkeypatch.setattr("mcp_server.tools.ingest._client", None)
     monkeypatch.setattr("mcp_server.tools.search.CHROMA_PATH", str(chroma_dir))
@@ -34,7 +39,7 @@ def clean_chroma(tmp_path, monkeypatch):
 
 async def _run():
     ingest_doc("tests/fixtures/sample.txt")
-    graph, ctx = await build_runtime_graph()
+    graph, ctx = await build_runtime_graph(model=LLM_MODEL_TEST)
     try:
         state = new_state("What is LangGraph?")
         result = await graph.ainvoke(state)

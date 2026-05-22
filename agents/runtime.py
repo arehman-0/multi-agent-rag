@@ -1,4 +1,5 @@
 """Production graph factory: spawns the MCP server subprocess and wires real Ollama LLM."""
+import os
 from contextlib import asynccontextmanager
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_ollama import ChatOllama
@@ -19,20 +20,27 @@ class _MCPToolWrapper:
 
 @asynccontextmanager
 async def mcp_session():
+    # Forward CHROMA_PATH to the MCP subprocess so E2E tests using a tmp dir
+    # are honoured by the subprocess (which re-reads config.py fresh on start).
+    mcp_env: dict[str, str] | None = None
+    if "CHROMA_PATH" in os.environ:
+        mcp_env = {**os.environ, "CHROMA_PATH": os.environ["CHROMA_PATH"]}
+
     client = MultiServerMCPClient({
         "rag": {
             "command": MCP_SERVER_CMD[0],
             "args": MCP_SERVER_CMD[1:],
             "transport": "stdio",
+            "env": mcp_env,
         }
     })
     tools = await client.get_tools()
     yield _MCPToolWrapper(tools)
 
 
-async def build_runtime_graph():
+async def build_runtime_graph(model: str = LLM_MODEL):
     """Returns (graph, mcp_context_manager). Caller must hold the context open while invoking."""
-    llm = ChatOllama(model=LLM_MODEL, base_url=OLLAMA_HOST)
+    llm = ChatOllama(model=model, base_url=OLLAMA_HOST)
     ctx = mcp_session()
     mcp_client = await ctx.__aenter__()
     graph = build_graph(mcp_client=mcp_client, llm=llm)
