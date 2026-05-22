@@ -25,3 +25,13 @@ def test_synthesize_no_chunks_returns_fallback():
     out = synthesize(s, llm=llm)
     assert "couldn't find relevant info" in out["answer"].lower()
     assert llm.last_prompt is None
+
+def test_synthesize_handles_llm_connection_error():
+    class BrokenLLM:
+        def invoke(self, prompt):
+            raise ConnectionError("ollama down")
+    s = new_state("q")
+    s["chunks"] = [{"text": "x", "source": "s", "score": 0.9, "hash": "h"}]
+    out = synthesize(s, llm=BrokenLLM())
+    assert "ollama" in out["answer"].lower()
+    assert out["citations"] == []

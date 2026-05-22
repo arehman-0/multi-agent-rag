@@ -52,7 +52,11 @@ def ingest_doc(path: str) -> dict[str, Any]:
     if not chunks:
         return {"status": "error", "reason": "no extractable text"}
     coll = _get_collection()
-    embeddings = [_embed(c) for c in chunks]
+    try:
+        embeddings = [_embed(c) for c in chunks]
+    except Exception:
+        return {"status": "error", "reason": "ollama_unreachable: start with `ollama serve`"}
+
     ids = [hashlib.sha1(f"{p.name}:{i}:{c[:50]}".encode()).hexdigest() for i, c in enumerate(chunks)]
     metas = [{"source": p.name, "chunk_index": i} for i in range(len(chunks))]
     coll.upsert(ids=ids, documents=chunks, embeddings=embeddings, metadatas=metas)

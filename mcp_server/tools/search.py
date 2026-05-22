@@ -25,7 +25,11 @@ def search_docs(query: str, k: int = RETRIEVAL_K) -> list[dict[str, Any]]:
     coll = _get_collection()
     if coll.count() == 0:
         return []
-    q_emb = _embed(query)
+    try:
+        q_emb = _embed(query)
+    except Exception:
+        return []
+
     res = coll.query(query_embeddings=[q_emb], n_results=min(k, coll.count()))
     chunks = []
     for doc, meta, dist in zip(res["documents"][0], res["metadatas"][0], res["distances"][0]):

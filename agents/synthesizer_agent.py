@@ -36,7 +36,15 @@ def synthesize(state: AgentState, llm) -> dict:
         )
         with tracer.start_as_current_span("llm_invoke") as llm_span:
             llm_span.set_attribute("prompt_len", len(prompt))
-            resp = llm.invoke(prompt)
+            try:
+                resp = llm.invoke(prompt)
+            except Exception as exc:
+                llm_span.set_attribute("ollama_down", True)
+                span.set_attribute("ollama_down", True)
+                return {
+                    "answer": "Ollama not running. Start it with `ollama serve` then reload.",
+                    "citations": [],
+                }
         answer = getattr(resp, "content", str(resp))
         citations = list({c["source"] for c in chunks})
         span.set_attribute("answer_len", len(answer))
